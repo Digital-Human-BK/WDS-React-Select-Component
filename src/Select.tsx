@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './Select.module.css';
 
 export type SelectOption = {
@@ -26,13 +26,18 @@ const Select = ({ multiple, value, onChange, options }: SelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const clearOption = (ev: React.MouseEvent<HTMLButtonElement>) => {
     ev.stopPropagation();
     multiple ? onChange([]) : onChange(undefined);
   };
 
   const selectOption = (
-    ev: React.MouseEvent<HTMLLIElement> | React.MouseEvent<HTMLButtonElement>,
+    ev:
+      | React.MouseEvent<HTMLLIElement>
+      | React.MouseEvent<HTMLButtonElement>
+      | KeyboardEvent,
     option: SelectOption
   ) => {
     if (multiple) {
@@ -63,8 +68,46 @@ const Select = ({ multiple, value, onChange, options }: SelectProps) => {
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    const handler = (ev: KeyboardEvent) => {
+      if (ev.target !== containerRef.current) {
+        return;
+      }
+
+      if (ev.code === 'Enter' || ev.code === 'Space') {
+        setIsOpen((prev) => !prev);
+        if (isOpen) {
+          selectOption(ev, options[highlightedIndex]);
+        }
+      }
+
+      if (ev.code === 'ArrowUp' || ev.code === 'ArrowDown') {
+        if (!isOpen) {
+          setIsOpen(true);
+          return;
+        }
+
+        const newValue = highlightedIndex + (ev.code === 'ArrowDown' ? 1 : -1);
+        if (newValue >= 0 && newValue <= options.length) {
+          setHighlightedIndex(newValue);
+        }
+      }
+
+      if(ev.code === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    containerRef.current?.addEventListener('keydown', handler);
+
+    return () => {
+      containerRef.current?.removeEventListener('keydown', handler);
+    };
+  }, [isOpen, highlightedIndex, options]);
+
   return (
     <div
+      ref={containerRef}
       onBlur={() => setIsOpen(false)}
       onClick={() => setIsOpen((prev) => !prev)}
       tabIndex={0}
@@ -74,12 +117,15 @@ const Select = ({ multiple, value, onChange, options }: SelectProps) => {
         {multiple
           ? value.map((v) => (
               <button
-              className={styles['option-badge']}
+                className={styles['option-badge']}
                 key={v.value}
                 onClick={(ev) => {
                   selectOption(ev, v);
                 }}
-              >{v.label}<span className={styles['remove-btn']}>&times;</span></button>
+              >
+                {v.label}
+                <span className={styles['remove-btn']}>&times;</span>
+              </button>
             ))
           : value?.label}
       </span>
